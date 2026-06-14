@@ -57,26 +57,38 @@ else:
         try:
             tty.setraw(fd)
             ch = sys.stdin.read(1)
+            if ch == "\x1b":
+                # Keep raw — try reading escape-sequence continuation
+                # with a short timeout via VMIN=0, VTIME=1 (100 ms).
+                attrs = termios.tcgetattr(fd)
+                cc_array = attrs[-1]  # control-character array (last element)
+                orig_vmin = cc_array[termios.VMIN]
+                orig_vtime = cc_array[termios.VTIME]
+                cc_array[termios.VMIN] = 0
+                cc_array[termios.VTIME] = 1
+                termios.tcsetattr(fd, termios.TCSADRAIN, attrs)
+                try:
+                    ch2 = sys.stdin.read(1)
+                finally:
+                    cc_array[termios.VMIN] = orig_vmin
+                    cc_array[termios.VTIME] = orig_vtime
+                    termios.tcsetattr(fd, termios.TCSADRAIN, attrs)
+                if ch2 == "[":
+                    cc_array[termios.VMIN] = 0
+                    cc_array[termios.VTIME] = 1
+                    termios.tcsetattr(fd, termios.TCSADRAIN, attrs)
+                    try:
+                        ch3 = sys.stdin.read(1)
+                    finally:
+                        cc_array[termios.VMIN] = orig_vmin
+                        cc_array[termios.VTIME] = orig_vtime
+                        termios.tcsetattr(fd, termios.TCSADRAIN, attrs)
+                    return {"A": KEY_UP, "B": KEY_DOWN}.get(ch3, KEY_ESC)
+                return KEY_ESC  # standalone Esc or unknown sequence
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
         if not ch:
             return ""
-        if ch == "\x1b":
-            fd2 = sys.stdin.fileno()
-            old2 = termios.tcgetattr(fd2)
-            try:
-                tty.setraw(fd2)
-                ch2 = sys.stdin.read(1)
-            finally:
-                termios.tcsetattr(fd2, termios.TCSADRAIN, old2)
-            if ch2 == "[":
-                try:
-                    tty.setraw(fd2)
-                    ch3 = sys.stdin.read(1)
-                finally:
-                    termios.tcsetattr(fd2, termios.TCSADRAIN, old2)
-                return {"A": KEY_UP, "B": KEY_DOWN}.get(ch3, "")
-            return KEY_ESC
         if ch in (chr(13), chr(10)):
             return KEY_ENTER
         if ch == "\x03":
@@ -124,15 +136,11 @@ def pick(items, title="Pick", start=0):
     want to handle those keys directly.
     """
     selected = start
-    lines = len(items) + 4  # estimated render height
     first = True
     while True:
-        if first:
-            first = False
-        else:
-            # move cursor back up and clear for in-place redraw
-            sys.stdout.write(f"\x1b[{lines}A\x1b[J")
-            sys.stdout.flush()
+        if not first:
+            console.clear()
+        first = False
         _render_picker(items, selected, title)
 
         k = read_key()

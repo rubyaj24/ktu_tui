@@ -38,7 +38,6 @@ from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.prompt import Prompt
-from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
@@ -90,32 +89,30 @@ MAIN_MENU: List[dict] = [
 # ---------------------------------------------------------------------------
 
 def build_header(client: KTUClient) -> Panel:
-    """Fixed header: app title + connection + welcome line."""
+    """Compact header: connection status + welcome."""
     who = client.welcome_name or client.username or ""
     if client.logged_in:
-        status = Text("● Online ", style="bold green")
-        status.append(f"   app.ktu.edu.in   ", style="dim")
-        status.append(f"   Welcome {who}", style="cyan")
+        status = Text("●", style="bold green")
+        status.append(" Online  ", style="green")
+        status.append("app.ktu.edu.in", style="dim")
     else:
-        status = Text("● Offline", style="bold red")
-        status.append("   — login required", style="dim")
+        status = Text("●", style="bold red")
+        status.append(" Offline", style="red")
+        status.append("  — not logged in", style="dim")
 
-    title = Text("KTU STUDENT PORTAL", style="bold white on blue")
-    title_text = Text(" ")
-    title_text.append(title)
-    title_text.append("  ")
+    left = Text("  ")
+    left.append_text(status)
 
-    body = Text()
-    body.append("  ")
-    body.append_text(status)
+    right = Text(f"Welcome {who}", style="cyan") if who else Text("")
 
-    return Panel(
-        body,
-        title=title,
-        title_align="left",
-        border_style="blue",
-        height=3,
-    )
+    from rich.table import Table
+    row = Table.grid(expand=True)
+    row.add_column(justify="left", ratio=1)
+    row.add_column(justify="right")
+    row.add_row(left, right)
+
+    return Panel(row, title="KTU Portal", title_align="left",
+                 border_style="bright_blue", height=3, padding=(0, 1))
 
 
 # ---------------------------------------------------------------------------
@@ -125,63 +122,31 @@ def build_header(client: KTUClient) -> Panel:
 def build_sidenav(client: KTUClient, sub_links: List[SidebarLink],
                   current_url: Optional[str],
                   selected_sub: int = -1) -> Panel:
-    """Left sidenav: main menu + a 'Page links' sub-section showing the
-    sub-links extracted from the current page (if any).
-
-    *selected_sub* — index into *sub_links* to highlight (used by
-    :func:`run_page_loop` for arrow-key navigation).
-    """
-    table = Table(
-        show_header=False,
-        show_lines=False,
-        border_style="blue",
-        expand=True,
-    )
-    table.add_column(justify="right", style="bold cyan", width=3)
-    table.add_column()
-    table.add_column(style="dim")
+    """Left sidenav: main menu + per-page sub-links."""
+    lines: List = [Text("")]
 
     for item in MAIN_MENU:
         is_current = (current_url and item.get("url") == current_url)
-        if is_current:
-            # Use a Text row with reverse style so rich handles the markup.
-            table.add_row(
-                Text("▶", style="reverse bold cyan"),
-                Text(item["label"], style="reverse bold cyan"),
-                Text(item["blurb"], style="reverse bold cyan"),
-            )
-        else:
-            table.add_row(
-                Text(item["key"], style="bold cyan"),
-                Text(item["label"]),
-                Text(item["blurb"], style="dim"),
-            )
+        marker = "▸" if is_current else " "
+        key = Text(f"{marker}{item['key']}", style="bold cyan")
+        label = item["label"]
+        style = "reverse bold" if is_current else ""
+        lines.append(Text.assemble(" ", key, "  ", Text(label, style=style)))
 
     if sub_links:
-        table.add_section()
-        table.add_row(
-            "", Text("─── Page links ───", style="dim italic"), "",
-        )
+        lines.append(Text(""))
+        lines.append(Text(" ── links ──", style="dim italic"))
         for i, link in enumerate(sub_links, 1):
-            display = link.text[:28] + ("…" if len(link.text) > 28 else "")
+            display = link.text[:22] + ("…" if len(link.text) > 22 else "")
             is_sel = (i - 1) == selected_sub
-            if is_sel:
-                table.add_row(
-                    f"▶ {i}",
-                    f"[reverse bold cyan]{display}[/reverse bold cyan]",
-                    f"[reverse bold cyan]{link.url[-30:]}[/reverse bold cyan]",
-                )
-            else:
-                table.add_row(
-                    f"{' ' if i >= 10 else ' '} {i}",
-                    f"[blue]{display}[/blue]",
-                    f"[dim]{link.url[-30:]}[/dim]",
-                )
+            m = "▸" if is_sel else " "
+            idx = Text(f"{m}{i}", style="bold cyan" if is_sel else "dim")
+            txt = Text(f" {display}", style="reverse bold" if is_sel else "dim")
+            lines.append(Text.assemble(" ", idx, txt))
 
-    body = Text()
-    body.append("Navigation\n\n", style="bold underline")
-    return Panel(table, title="[bold]Menu[/bold]", border_style="blue",
-                 title_align="left")
+    from rich.console import Group
+    return Panel(Group(*lines), title="Menu", border_style="bright_blue",
+                 title_align="left", padding=(0, 1))
 
 
 # ---------------------------------------------------------------------------
@@ -191,112 +156,92 @@ def build_sidenav(client: KTUClient, sub_links: List[SidebarLink],
 def render_snapshot(snap: PageSnapshot, page_url: str) -> Panel:
     """Render a PageSnapshot into a single Panel."""
     if not snap.has_anything:
-        return Panel(
-            Text("This page returned no extractable data.\n"
-                 "It may require a JavaScript runtime, or the page layout\n"
-                 "is different from the patterns we recognise.",
-                 style="italic yellow"),
-            title="(no data)",
-            border_style="yellow",
-        )
+        return Panel(Text("No extractable data — the page may need JavaScript.",
+                          style="italic yellow"),
+                     title="(empty)", border_style="yellow")
 
     renderables: List = []
+    from rich.markup import escape
 
     # 1. Welcome / page header
     header_parts: List[str] = []
     if snap.welcome_user:
-        # Escape any brackets in the name so they're treated as text, not markup.
-        from rich.markup import escape
         header_parts.append(f"Welcome, [bold cyan]{escape(snap.welcome_user)}[/bold cyan]")
     if snap.title and snap.title != "APJ Abdul Kalam Technological University":
-        from rich.markup import escape
         header_parts.append(f"[dim]{escape(snap.title)}[/dim]")
     if header_parts:
-        renderables.append(Text.from_markup(" • ".join(header_parts)))
-        renderables.append(Rule(style="dim"))
+        renderables.append(Text.from_markup("  " + "  •  ".join(header_parts)))
 
-    # 2. Empty / alert messages
+    # 2. Alert / status messages (compact single-line)
     for msg in snap.empty_messages:
-        if "[!]" in msg:
-            renderables.append(Panel(msg.replace("[!] ", ""), border_style="red",
-                                     title="error"))
-        elif "[i]" in msg:
-            renderables.append(Panel(msg.replace("[i] ", ""), border_style="blue",
-                                     title="info"))
-        elif "[w]" in msg:
-            renderables.append(Panel(msg.replace("[w] ", ""), border_style="yellow",
-                                     title="warning"))
-        elif "[OK]" in msg:
-            renderables.append(Panel(msg.replace("[OK] ", ""), border_style="green",
-                                     title="ok"))
-        else:
-            renderables.append(Panel(msg, border_style="white"))
+        tags = {"[!] ": ("error", "red"), "[i] ": ("info", "bright_blue"),
+                "[w] ": ("warning", "yellow"), "[OK] ": ("ok", "green")}
+        matched = False
+        for prefix, (title, color) in tags.items():
+            if prefix in msg:
+                renderables.append(Panel(msg.replace(prefix, ""),
+                                         border_style=color, title=title,
+                                         padding=(0, 1)))
+                matched = True
+                break
+        if not matched:
+            renderables.append(Panel(msg, border_style="white", padding=(0, 1)))
 
-    # 3. Panel section titles (dashboard shell)
+    # 3. Panel section titles
     if snap.panel_titles:
-        pt = Table(title="[bold]Dashboard sections[/bold]",
-                   show_header=False, border_style="blue")
-        pt.add_column(justify="right", style="bold cyan", width=4)
-        pt.add_column()
-        for i, t in enumerate(snap.panel_titles, 1):
-            pt.add_row(str(i), t)
-        renderables.append(pt)
-        renderables.append(Text(
-            "(section bodies are JS-populated on the portal; "
-            "visit them in a browser for live values)",
-            style="dim italic"))
+        is_dashboard = DASHBOARD_URL in page_url
+        if is_dashboard and len(snap.panel_titles) > 2:
+            renderables.append(Text("  Dashboard sections", style="bold underline"))
+            for t in snap.panel_titles:
+                renderables.append(Text(f"    • {t}", style="cyan"))
+            renderables.append(Text("  (JS-populated — visit in a browser for live values)",
+                                    style="dim italic"))
+        else:
+            for t in snap.panel_titles:
+                renderables.append(Text(f"  {t}", style="bold"))
 
     # 4. KV blocks (profile)
-    for i, block in enumerate(snap.kv_blocks, 1):
-        title = "Profile fields" if i == 1 else f"Profile fields (cont. {i})"
-        renderables.append(_render_kv_table(block, title))
+    if snap.kv_blocks:
+        merged = []
+        for block in snap.kv_blocks:
+            merged.extend(block)
+        renderables.append(_render_kv_grouped(merged, ""))
 
     # 5. Tables
-    for i, tb in enumerate(snap.tables, 1):
-        title = f"Table {i}" if len(snap.tables) > 1 else "Data"
-        renderables.append(_render_table_block(tb, title))
+    for tb in snap.tables:
+        renderables.append(_render_table_block(tb, ""))
 
     # 6. List items (alerts)
     if snap.list_items:
-        lt = Table(title="[bold]Alerts / list items[/bold]",
-                   show_header=True, header_style="bold", border_style="blue")
-        lt.add_column("#", width=3)
+        lt = Table(show_header=True, header_style="bold", border_style="bright_blue")
+        lt.add_column("#", width=3, style="dim")
         lt.add_column("Title", style="bold")
         lt.add_column("Details", overflow="fold")
         for j, li in enumerate(snap.list_items, 1):
             lt.add_row(str(j), li.title, li.description)
         renderables.append(lt)
 
-    # 7. Form options (exam definition)
+    # 7. Form options (exam year / type pickers)
     if snap.form_options:
         for form_name, opts in snap.form_options.items():
-            ft = Table(title=f"[bold]Form: {form_name}[/bold]",
-                       show_header=True, header_style="bold", border_style="blue")
-            ft.add_column("#", width=3)
-            ft.add_column("Value")
-            ft.add_column("Label", overflow="fold")
-            for j, opt in enumerate(opts, 1):
-                marker = " ▶" if opt.get("selected") else ""
-                ft.add_row(str(j), opt["value"] + marker, opt["label"])
-            renderables.append(ft)
+            nice = form_name[0].upper() + form_name[1:] if form_name else ""
+            renderables.append(Text(f"  {nice}", style="bold underline"))
+            for opt in opts:
+                val = opt['value']
+                label = opt['label']
+                if not label or label in ("-Select-", "Select"):
+                    continue
+                sel = " ◀ selected" if opt.get("selected") else ""
+                renderables.append(Text.from_markup(
+                    f"    {label}  [dim]({val}{sel})[/dim]" if val
+                    else f"    {label}"))
 
-    # 8. Sidebar links (already shown in sidenav, but list them as a
-    #    textual breadcrumb at the bottom of the content)
-    if snap.sidebar_links:
-        bc = Text()
-        bc.append("Page links: ", style="bold dim")
-        bc.append("  •  ".join(link.text for link in snap.sidebar_links),
-                  style="blue underline")
-        renderables.append(bc)
-
-    body = Text()
-    # combine: rich Layout doesn't accept a list of renderables directly,
-    # so we use a Group.  Easiest: renderables to a single Panel via
-    # rich.console.Group.
     from rich.console import Group
-    group = Group(*renderables)
-    return Panel(group, title=f"[bold]{_short_url(page_url)}[/bold]",
-                 border_style="blue", title_align="left", padding=(0, 1))
+    return Panel(
+        Group(*renderables),
+        title=f"[bold]{_short_url(page_url)}[/bold]",
+        border_style="bright_blue", title_align="left", padding=(0, 1),
+    )
 
 
 def _short_url(url: str) -> str:
@@ -316,8 +261,8 @@ def _render_kv_table(block: List[KVRow], title: str) -> Table:
 
 
 def _render_table_block(tb, title: str) -> Table:
-    table = Table(title=f"[bold]{title}[/bold]", show_header=True,
-                  header_style="bold", border_style="blue")
+    table = Table(title=f"[bold]{title}[/bold]" if title else None,
+                  show_header=True, header_style="bold", border_style="bright_blue")
     if tb.headers:
         for h in tb.headers:
             table.add_column(h, overflow="fold")
@@ -326,7 +271,6 @@ def _render_table_block(tb, title: str) -> Table:
         for i in range(ncols):
             table.add_column(f"Col {i+1}", overflow="fold")
     for row in tb.rows:
-        # pad row to header count
         padded = row + [""] * (len(table.columns) - len(row))
         table.add_row(*padded)
     return table
@@ -343,19 +287,22 @@ def build_statusbar(client: KTUClient, last_msg: str = "") -> Panel:
         left.append(" " + last_msg + "  ", style="italic")
     else:
         left.append(" Ready. ", style="italic dim")
-    left.append(" │ ", style="dim")
-    left.append("F5", style="bold cyan"); left.append(" refresh  ", style="dim")
-    left.append("L", style="bold cyan"); left.append(" (re)login  ", style="dim")
-    left.append("B", style="bold cyan"); left.append(" back  ", style="dim")
-    left.append("Q", style="bold cyan"); left.append(" quit", style="dim")
+    left.append("│", style="dim")
+    left.append(" R", style="bold cyan"); left.append("refresh", style="dim")
+    left.append(" │", style="dim")
+    left.append(" L", style="bold cyan"); left.append("login", style="dim")
+    left.append(" │", style="dim")
+    left.append(" B", style="bold cyan"); left.append("back", style="dim")
+    left.append(" │", style="dim")
+    left.append(" Q", style="bold cyan"); left.append("quit", style="dim")
 
-    right = Text(f"ktu_tui v{VERSION}  ", style="dim")
+    right = Text(f" v{VERSION}", style="dim")
     body = Table.grid(expand=True)
     body.add_column(justify="left", ratio=1)
     body.add_column(justify="right")
     body.add_row(left, right)
 
-    return Panel(body, height=3, border_style="blue")
+    return Panel(body, height=3, border_style="bright_blue", padding=(0, 1))
 
 
 # ---------------------------------------------------------------------------
@@ -372,8 +319,8 @@ def build_layout(client: KTUClient, sub_links: List[SidebarLink],
         Layout(name="status", size=3),
     )
     layout["body"].split_row(
-        Layout(name="sidenav", size=38),
-        Layout(name="content", ratio=1),
+        Layout(name="sidenav", ratio=1),
+        Layout(name="content", ratio=3),
     )
     layout["header"].update(build_header(client))
     layout["sidenav"].update(build_sidenav(client, sub_links, current_url, selected_sub))
@@ -447,7 +394,7 @@ def show_main_menu(client: KTUClient) -> str:
     layout = build_layout(client, [], content, None,
                           last_msg="Press 1-6 to pick a page, L to login.")
 
-    with Live(layout, console=console, refresh_per_second=4, screen=False) as live:
+    with Live(layout, console=console, refresh_per_second=0, screen=False) as live:
         while True:
             choice = Prompt.ask("[bold cyan]Pick[/bold cyan]").strip().lower()
             if choice in ("q", "0", "quit"):
@@ -530,14 +477,15 @@ def run_page_loop(client: KTUClient, menu_key: str) -> str:
     url = item["url"]
     last_msg = ""
     sub_idx = -1
-    content_panel: Optional[Panel] = None
 
     if url is None:
         return "back"
 
-    layout, msg, sub_links = fetch_and_render(client, url, last_msg=last_msg)
-    content_panel = layout["content"].renderable  # preserve current content
-    with Live(layout, console=console, refresh_per_second=4, screen=False) as live:
+    layout, msg, sub_links = fetch_and_render(client, url)
+    content_panel = layout["content"].renderable
+    sub_idx = -1
+
+    with Live(layout, console=console, refresh_per_second=0, screen=True) as live:
         while True:
             try:
                 k = read_key()
@@ -553,28 +501,35 @@ def run_page_loop(client: KTUClient, menu_key: str) -> str:
                 client.logout()
                 return "login"
             if k == "r":
-                if "exam" in url.lower() or "examtype" in res_html_for_exam_check(client, url).lower():
-                    academic_year, exam_type = _prompt_exam_filters(client, url)
-                    if academic_year is None:
-                        continue
-                    res = client.fetch_exam_notifications(academic_year, exam_type)
-                    if res.ok:
-                        snap = KTUParser.parse(res.html)
-                        new_content = render_snapshot(snap, url)
-                        new_sub = [sl for sl in snap.sidebar_links
-                                   if sl.text and sl.text.lower() != "logout"]
-                        live.update(build_layout(client, new_sub, new_content, url,
-                                                  last_msg=f"Refreshed: year={academic_year!r}, type={exam_type!r}"))
-                        content_panel = new_content
+                try:
+                    if "exam" in url.lower() or "examtype" in (
+                        res_html_for_exam_check(client, url) or ""
+                    ).lower():
+                        academic_year, exam_type = _prompt_exam_filters(client, url)
+                        if academic_year is None:
+                            continue
+                        res = client.fetch_exam_notifications(academic_year, exam_type)
+                        if res.ok:
+                            snap = KTUParser.parse(res.html)
+                            new_content = render_snapshot(snap, url)
+                            new_sub = [sl for sl in snap.sidebar_links
+                                       if sl.text and sl.text.lower() != "logout"]
+                            live.update(build_layout(
+                                client, new_sub, new_content, url,
+                                last_msg=f"Refreshed: year={academic_year!r}, type={exam_type!r}"))
+                            content_panel = new_content
+                            sub_links = new_sub
+                            sub_idx = -1
+                    else:
+                        new_layout, new_msg, new_sub = fetch_and_render(
+                            client, url, last_msg="Refreshing...")
+                        live.update(new_layout)
+                        content_panel = new_layout["content"].renderable
                         sub_links = new_sub
                         sub_idx = -1
-                else:
-                    new_layout, new_msg, new_sub = fetch_and_render(client, url, last_msg="Refreshing...")
-                    live.update(new_layout)
-                    content_panel = new_layout["content"].renderable
-                    sub_links = new_sub
-                    sub_idx = -1
-                    last_msg = new_msg
+                        last_msg = new_msg
+                except Exception:
+                    last_msg = "Refresh failed"
                 continue
 
             # ── arrow keys ────────────────────────────────────────────
@@ -591,12 +546,15 @@ def run_page_loop(client: KTUClient, menu_key: str) -> str:
                 continue
 
             if k == KEY_ENTER and 0 <= sub_idx < len(sub_links):
-                cp, new_url, new_sub, msg = _follow_sub_link(client, sub_links[sub_idx])
-                if cp is None:
-                    last_msg = msg
-                    continue
-                live.update(build_layout(client, new_sub, cp, new_url, last_msg=msg))
-                url, sub_links, content_panel, sub_idx = new_url, new_sub, cp, -1
+                try:
+                    cp, new_url, new_sub, msg = _follow_sub_link(client, sub_links[sub_idx])
+                    if cp is None:
+                        last_msg = msg
+                        continue
+                    live.update(build_layout(client, new_sub, cp, new_url, last_msg=msg))
+                    url, sub_links, content_panel, sub_idx = new_url, new_sub, cp, -1
+                except Exception:
+                    last_msg = "Link failed"
                 continue
 
             if k == KEY_ESC:
@@ -606,17 +564,20 @@ def run_page_loop(client: KTUClient, menu_key: str) -> str:
                 continue
 
             # ── numeric keys ──────────────────────────────────────────
-            if k.isdigit():
+            if k and len(k) == 1 and k.isdigit():
                 if k in (i["key"] for i in MAIN_MENU):
                     return k
                 idx = int(k) - 1
                 if 0 <= idx < len(sub_links):
-                    cp, new_url, new_sub, msg = _follow_sub_link(client, sub_links[idx])
-                    if cp is None:
-                        last_msg = msg
-                        continue
-                    live.update(build_layout(client, new_sub, cp, new_url, last_msg=msg))
-                    url, sub_links, content_panel, sub_idx = new_url, new_sub, cp, -1
+                    try:
+                        cp, new_url, new_sub, msg = _follow_sub_link(client, sub_links[idx])
+                        if cp is None:
+                            last_msg = msg
+                            continue
+                        live.update(build_layout(client, new_sub, cp, new_url, last_msg=msg))
+                        url, sub_links, content_panel, sub_idx = new_url, new_sub, cp, -1
+                    except Exception:
+                        last_msg = "Link failed"
                 continue
 
             if k == KEY_CTRL_C:
@@ -789,37 +750,10 @@ def cmd_check_pages() -> int:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# KV grouping helpers
 # ---------------------------------------------------------------------------
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="KTU Portal TUI client v" + VERSION)
-    parser.add_argument("--version", action="store_true", help="print version and exit")
-    parser.add_argument("--probe", action="store_true", help="show public endpoint inventory")
-    parser.add_argument("--check-pages", action="store_true",
-                        help="test the parser against the saved HTML pages in debug/pages/")
-    args = parser.parse_args()
 
-    if args.version:
-        print(f"ktu_tui v{VERSION}")
-        return 0
-    if args.probe:
-        return cmd_probe()
-    if args.check_pages:
-        return cmd_check_pages()
-
-    client = KTUClient()
-    try:
-        return run_tui(client)
-    except KeyboardInterrupt:
-        console.print("\n[bold cyan]Goodbye![/bold cyan]")
-        return 0
-    finally:
-        client.logout()
-
-
-if __name__ == "__main__":
-    sys.exit(main())
 def _group_kv(block):
     """Group KV rows by semantic category. Returns dict."""
     groups = {"identity": [], "contact": [], "academic": [], "other": []}
@@ -858,16 +792,12 @@ def _render_kv_grouped(block, title):
     groups = _group_kv(block)
     titles = {"identity": "Personal", "contact": "Contact", "academic": "Academic", "other": "Other"}
     items = []
-    # overall header
-    items.append(Text(""))
-    items.append(Text(title, style="bold underline cyan"))
-    items.append(Rule(style="dim"))
-    # if only 1 group, just render a single table
+    if title:
+        items.append(Text(title, style="bold underline cyan"))
     if len(groups) == 1:
         gname, rows = next(iter(groups.items()))
         items.append(_kv_table(rows, titles.get(gname, gname)))
         return RichGroup(*items)
-    # multiple groups
     for gname, rows in groups.items():
         items.append(Text(titles.get(gname, gname), style="bold cyan"))
         items.append(_kv_table(rows, ""))
@@ -876,7 +806,44 @@ def _render_kv_grouped(block, title):
 
 def _kv_table(block, subtitle):
     table = Table(title=("[bold]" + subtitle + "[/bold]") if subtitle else None,
-                  show_header=True, header_style="bold", border_style="blue",
+                  show_header=True, header_style="bold", border_style="bright_blue",
                   title_justify="left")
-    table.add_column("Field", style="bold cyan", width=28, no_wrap=True)
+    table.add_column("Field", style="bold cyan", width=24)
     table.add_column("Value", overflow="fold")
+    for row in block:
+        table.add_row(row.key, row.value or "—")
+    return table
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="KTU Portal TUI client v" + VERSION)
+    parser.add_argument("--version", action="store_true", help="print version and exit")
+    parser.add_argument("--probe", action="store_true", help="show public endpoint inventory")
+    parser.add_argument("--check-pages", action="store_true",
+                        help="test the parser against the saved HTML pages in debug/pages/")
+    args = parser.parse_args()
+
+    if args.version:
+        print(f"ktu_tui v{VERSION}")
+        return 0
+    if args.probe:
+        return cmd_probe()
+    if args.check_pages:
+        return cmd_check_pages()
+
+    client = KTUClient()
+    try:
+        return run_tui(client)
+    except KeyboardInterrupt:
+        console.print("\n[bold cyan]Goodbye![/bold cyan]")
+        return 0
+    finally:
+        client.logout()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

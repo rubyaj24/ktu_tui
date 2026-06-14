@@ -1,59 +1,41 @@
 # KTU Portal TUI
 
-A personal terminal client for the APJ Abdul Kalam Technological University
-e-Governance portal (app.ktu.edu.in).
+Terminal client for the APJ Abdul Kalam Technological University
+e-Governance portal ([app.ktu.edu.in](https://app.ktu.edu.in)).
 
-## Features
+## Setup
 
-* Form-based login with CSRF + session handling
-* Dashboard, Profile, Exam definitions, Pending results, Student details
-* Sidenav-driven TUI with fixed header, sidebar, and status bar (v0.4)
-* Page-aware sub-links: shows the sidebar links extracted from each page
-* Rate-limited (1 req/s, burst 3) to be polite to the AWS ALB
-* Offline preview mode (preview_screens.py) — no live network needed
-
-## Install
-
-```
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # Linux/macOS
 pip install -r requirements.txt
 ```
 
 ## Run
 
-```
+```bash
 cd src
-python3 ktu_tui.py             # interactive TUI
-python3 ktu_tui.py --version
-python3 ktu_tui.py --probe     # public endpoint inventory
-python3 ktu_tui.py --check-pages   # test parser against saved HTML
+python3 ktu_tui.py
 ```
 
-## Layout
+| Key | Action |
+|-----|--------|
+| `↑` `↓` | Navigate |
+| `Enter` | Select |
+| `r` | Refresh |
+| `b` | Back |
+| `l` | Re-login |
+| `q` | Quit |
+
+## Project
 
 ```
-+- KTU STUDENT PORTAL -  Online  app.ktu.edu.in  Welcome NAME -+  header
-+------+--------------------------------+
-| Menu |  content (rendered PageSnapshot)|
-|  1 D |                                  |
-|  2 E |                                  |
-|  3 P |                                  |
-+------+--------------------------------+
-| Ready | F5 refresh L login B back Q quit|  status
-+------+--------------------------------+
+src/
+├── ktu_tui.py          # TUI entry point
+├── ktu_input.py        # Key reader
+├── ktu_client.py       # HTTP client
+├── ktu_parser.py       # HTML parser
+└── preview_screens.py  # Offline preview
 ```
 
-## Files
-
-| File | Purpose |
-|------|---------|
-| src/ktu_tui.py | TUI entry point, header/sidenav/content/statusbar layout |
-| src/ktu_client.py | HTTP client with rate limiter, CSRF, session-expiry detection |
-| src/ktu_parser.py | HTML -> PageSnapshot (welcome, panels, KV, tables, alerts, sidebar links) |
-| src/preview_screens.py | Offline screen preview (no network) |
-| src/ktu_tui_v0.py | Original v0.1 script (archived) |
-| docs/architecture.md | Full architecture report |
-| debug/pages/*.html | Saved HTML pages used to build the parser |
-
-## See also
-
-docs/architecture.md - full system architecture
+See `docs/architecture.md` for full architecture and server interaction details.

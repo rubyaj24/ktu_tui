@@ -1,0 +1,1 @@
+"""Append this to ktu_input.py to enable arrow-key menu pick

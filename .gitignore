@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# TUI runtime data
+.ktu_tui/
+debug/page_dump*.html
+ktu_page_dump.html

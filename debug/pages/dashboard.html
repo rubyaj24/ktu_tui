@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+<title>APJ Abdul Kalam Technological University</title>
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+	<div id="loader" class="center">
+		<div id="spinner" class="center"></div>
+	</div>
+
+	<div class="navbar navbar-default navbar-fixed-top" role="navigation">
+		<ul class="nav navbar-nav">
+			<li><a class="label-block">
+				<div class="custom-tooltip">
+					<span class="tooltiptext">Welcome AMALJITH  V</span>
+					<div class="headerLabelContent">Welcome AMALJITH  V</div>
+				</div>
+			</a></li>
+			<li><a href="/logout.htm">Logout</a></li>
+		</ul>
+	</div>
+
+	<div id="sidebar-wrapper">
+		<nav id="menu-ecoleaide" class="left show">
+			<ul class="menu">
+				<li class="sidebar-brand">Administration</li>
+				<li id="337" class="menuclass"><a href='/eu/alt/dashboard.htm'>Dashboard</a></li>
+				<li id="336" class="menuclass"><a href='/eu/alt/listAlertMessage.htm'>Alerts</a></li>
+				<li id="370" class="menuclass"><a href='/eu/pr/listUserPaymentRequest.htm'>Payment Request</a></li>
+				<li id="340" class="menuclass"><a href='/eu/stu/changeUserContactDetails.htm'>Update Contact Info</a></li>
+			</ul>
+		</nav>
+	</div>
+
+	<div id="page-content-wrapper">
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-lg-12">
+					<div class="inner-menu">
+						<ul class="module">
+							<li id="0"><a href="/eu/alt/dashboard.htm">Home</a></li>
+							<li id="4"><a href="/eu/stu/studentBasicProfile.htm">Student</a></li>
+							<li id="6"><a href="/eu/exm/viewStudentExamDefinition.htm">Exam</a></li>
+							<li id="7"><a href="/eu/res/pendingResults.htm">Result</a></li>
+							<li id="17"><a href="/eu/tkt/listRequesterTicketRequest.htm">Grievance Redressal Tickets</a></li>
+							<li id="18"><a href="/eu/frm/formListing.htm">Forms</a></li>
+							<li id="22"><a href="/eu/suraksha/surakshaSchemeIntroduction.htm">Suraksha</a></li>
+						</ul>
+					</div>
+
+					<div id="dashboardDiv" class="panel panel-default">
+						<div class="panel-heading">
+							<h3 class="panel-title">Dashboard</h3>
+						</div>
+						<div class="panel-body">
+							<div class="col-md-6"><div class="panel panel-default panel-success"><div class="panel-heading"><h3 class="panel-title" style="color:darkcyan;">Welcome</h3></div><div id="div_1" class="panel-body"></div></div></div>
+							<div class="col-md-6"><div class="panel panel-default panel-success"><div class="panel-heading"><h3 class="panel-title" style="color:darkcyan;">Fee Details</h3></div><div id="div_2" class="panel-body"></div></div></div>
+							<div class="col-md-12"><div class="panel panel-default panel-success"><div class="panel-heading"><h3 class="panel-title" style="color:darkcyan;">Suraksha</h3></div><div id="div_7" class="panel-body"></div></div></div>
+							<div class="col-md-12"><div class="panel panel-default widget"><div class="panel-heading"><h3 class="panel-title">Alerts</h3></div><div id="div_5" class="panel-body"></div></div></div>
+							<div class="col-md-12"><div class="panel panel-default panel-success"><div class="panel-heading"><h3 class="panel-title" style="color:darkcyan;">Feedback Form</h3></div><div id="div_9" class="panel-body"></div></div></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script src="/js/jquery-1.11.3.min.js"></script>
+	<script src="/js/alt/dashboard.js"></script>
+	<script>
+		document.onreadystatechange = function() {
+			if (document.readyState !== "complete") {
+				document.querySelector("body").style.visibility = "hidden";
+				document.querySelector("#loader").style.visibility = "visible";
+			} else {
+				document.querySelector("#loader").style.display = "none";
+				document.querySelector("body").style.visibility = "visible";
+			}
+		};
+	</script>
+</body>
+</html>

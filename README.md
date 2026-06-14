@@ -1,7 +1,9 @@
 # KTU Portal TUI
 
-Terminal client for the APJ Abdul Kalam Technological University
-e-Governance portal ([app.ktu.edu.in](https://app.ktu.edu.in)).
+I built this terminal client for the APJ Abdul Kalam Technological University
+e-Governance portal ([app.ktu.edu.in](https://app.ktu.edu.in))
+because I wanted a faster way to check my results, profile, and exam schedules
+without clicking through the web interface.
 
 ## Setup
 
@@ -10,6 +12,9 @@ python3 -m venv .venv
 source .venv/bin/activate          # Linux/macOS
 pip install -r requirements.txt
 ```
+
+> **Windows:** My raw key reader has a Windows branch (`msvcrt`), but I
+> only test on Linux. You may need to adjust terminal handling.
 
 ## Run
 
@@ -38,4 +43,4 @@ src/
 └── preview_screens.py  # Offline preview
 ```
 
-See `docs/architecture.md` for full architecture and server interaction details.
+I put all architecture and server-interaction details in `docs/architecture.md`.

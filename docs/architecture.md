@@ -4,6 +4,15 @@
 
 ---
 
+## Why I Built This
+
+I was tired of opening a browser, logging into the portal, clicking through
+menus, and waiting for pages to load every time I needed to check my grades,
+exam schedule, or profile. I wanted something I could launch from my terminal
+and navigate with a few keystrokes — no mouse, no tabs, no JavaScript spinner.
+
+---
+
 ## Overview
 
 ```mermaid
@@ -225,13 +234,15 @@ sequenceDiagram
 
 ### Rate Limiting
 
-ALB enforces ~5 req/s per IP. The client uses a **token bucket**:
+ALB enforces ~5 req/s per IP. I use a **token bucket**:
 capacity=3, refill=1/s — stays under the cap while allowing short
 bursts for navigation.
 
 ---
 
 ## Stack Fingerprint
+
+Here's what I found by inspecting the portal's responses and cookies:
 
 | Layer | Finding |
 |-------|---------|
@@ -245,6 +256,7 @@ bursts for navigation.
 
 ## URL Convention
 
+I discovered the portal follows a consistent URL pattern:
 `https://app.ktu.edu.in/eu/<module>/<verb>.htm`
 
 - Public: `/eu/anon/` (about, FAQ, contact)
@@ -252,9 +264,11 @@ bursts for navigation.
 
 ## HTML Patterns
 
-| Pattern | Detection |
-|---------|-----------|
-| Spinner overlay | `<div id="loader">` — visual only, content is in HTTP body |
+I reverse-engineered these repeated HTML structures from the Bootstrap 3 pages:
+
+| Pattern | How I detect it |
+|---------|-----------------|
+| Spinner overlay | `<div id="loader">` — visual only, full content is in HTTP body |
 | Auth marker | `<span class="tooltiptext">Welcome NAME</span>` |
 | KV blocks | `<ul class="list-group">` with `<span class="view-badge">` labels |
 | Tables | `<table>` with `<th>` headers |
@@ -268,32 +282,33 @@ bursts for navigation.
 
 ### Key Design Decisions
 
-- **Credentials stay in memory only** — never written to disk
-- **Rate-limited** — 1 req/s, burst 3
+- **Credentials stay in memory only** — I never write them to disk
+- **Rate-limited** — 1 req/s, burst 3 (I don't want to hammer the ALB)
 - **Arrow navigation** — single-key commands (`r`, `b`, `l`, `q`) or arrows + Enter
-- **No TUI framework** — built on Rich's `Live` + `Layout` + raw termios
-- **Offline preview** — `preview_screens.py` renders saved HTML
+- **No TUI framework** — I built it on Rich's `Live` + `Layout` + raw termios
+- **Offline preview** — `preview_screens.py` renders saved HTML without hitting the network
 
 ### Input Handling (`ktu_input.py`)
 
-- Unix branch: `tty.setraw()` + `sys.stdin.read(1)` for single-byte keys
-- Escape sequences (arrow keys): 100ms timeout via `VMIN=0, VTIME=1` to distinguish `Esc` from `\x1b[A`
-- Windows branch: `msvcrt.getch()` for equivalent behavior
+- **Unix:** I use `tty.setraw()` + `sys.stdin.read(1)` for single-byte keys
+- **Escape sequences:** I apply a 100ms timeout (`VMIN=0, VTIME=1`) to tell Esc apart from `\x1b[A` (arrow keys)
+- **Windows:** I wrote an `msvcrt.getch()` branch, though I haven't tested it much
 
-### Session-Expiry Detection
+### Session-Expiry Detection (the v0.1 bug)
 
-v0.1 bug: checking for `name="loginform"` was too loose — every
-authenticated page has a logout form with that attribute.
+I originally checked for `name="loginform"` to detect the login page, but that
+was way too loose — every authenticated page has a logout form with
+that attribute, so I kept getting false "session expired" reports.
 
-**Fix:** require at least 2 of `id="login-username"`,
-`id="login-password"`, `id="btn-login"` — these only appear on the
-actual login form.
+**Fix:** I now require at least 2 of `id="login-username"`,
+`id="login-password"`, `id="btn-login"`. These only show up on the
+actual login page.
 
 ### Spinner Truth
 
-The `<div id="loader">` spinner is a **visual jQuery effect**, not a
-placeholder. Full page content is in the HTTP response. No retry needed
-(v0.2's retry was removed in v0.3).
+The portal's `<div id="loader">` spinner is a **visual jQuery effect**, not a
+placeholder. I initially thought the page was incomplete and added a retry
+in v0.2 — wasted effort. The full content is always in the HTTP response body.
 
 ---
 
@@ -311,10 +326,12 @@ placeholder. Full page content is in the HTTP response. No retry needed
 
 ## Security & Ethics
 
-- Credentials read via `getpass`, held in memory only
-- All requests rate-limited — no aggressive scraping
-- CSRF token read from server and returned exactly as a browser would
-- No third-party data sent anywhere
+- I read credentials via `getpass` and keep them in memory only
+- I rate-limit every request — no aggressive scraping
+- I read the CSRF token from the server and send it back exactly as a browser would
+- No third-party data leaves my machine
+
+I built this to access **my own student data** only.
 
 ---
 

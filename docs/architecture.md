@@ -8,7 +8,7 @@
 
 I was tired of opening a browser, logging into the portal, clicking through
 menus, and waiting for pages to load every time I needed to check my grades,
-exam schedule, or profile. I wanted something I could launch from my terminal
+exam schedule, or profile. I wanted something that could launch from my terminal
 and navigate with a few keystrokes — no mouse, no tabs, no JavaScript spinner.
 
 ---
@@ -234,7 +234,7 @@ sequenceDiagram
 
 ### Rate Limiting
 
-ALB enforces ~5 req/s per IP. I use a **token bucket**:
+ALB enforces ~5 req/s per IP.A **token bucket**:
 capacity=3, refill=1/s — stays under the cap while allowing short
 bursts for navigation.
 
@@ -242,7 +242,7 @@ bursts for navigation.
 
 ## Stack Fingerprint
 
-Here's what I found by inspecting the portal's responses and cookies:
+After continues debugging, it is found that:
 
 | Layer | Finding |
 |-------|---------|
@@ -282,7 +282,7 @@ I reverse-engineered these repeated HTML structures from the Bootstrap 3 pages:
 
 ### Key Design Decisions
 
-- **Credentials stay in memory only** — I never write them to disk
+- **Credentials stay in memory only** — never write them to disk
 - **Rate-limited** — 1 req/s, burst 3 (I don't want to hammer the ALB)
 - **Arrow navigation** — single-key commands (`r`, `b`, `l`, `q`) or arrows + Enter
 - **No TUI framework** — I built it on Rich's `Live` + `Layout` + raw termios
@@ -300,14 +300,14 @@ I originally checked for `name="loginform"` to detect the login page, but that
 was way too loose — every authenticated page has a logout form with
 that attribute, so I kept getting false "session expired" reports.
 
-**Fix:** I now require at least 2 of `id="login-username"`,
+**Fix:** now require at least 2 of `id="login-username"`,
 `id="login-password"`, `id="btn-login"`. These only show up on the
 actual login page.
 
 ### Spinner Truth
 
 The portal's `<div id="loader">` spinner is a **visual jQuery effect**, not a
-placeholder. I initially thought the page was incomplete and added a retry
+placeholder. Initially thought the page was incomplete and added a retry
 in v0.2 — wasted effort. The full content is always in the HTTP response body.
 
 ---
@@ -331,7 +331,7 @@ in v0.2 — wasted effort. The full content is always in the HTTP response body.
 - I read the CSRF token from the server and send it back exactly as a browser would
 - No third-party data leaves my machine
 
-I built this to access **my own student data** only.
+I built this to access **own student data** only.
 
 ---
 
@@ -350,3 +350,6 @@ I built this to access **my own student data** only.
 | `src/ktu_client.py` | HTTP client with CSRF/rate-limiter |
 | `src/ktu_parser.py` | HTML → PageSnapshot parser |
 | `src/preview_screens.py` | Offline screen preview |
+
+## Debugging
+It is good to save .htm pages in /debug file for better understanding how this works.

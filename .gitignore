@@ -13,6 +13,6 @@ ktu_page_dump.html
 .env
 
 # Debug logs (keep hand-collected pages, ignore generated dumps)
-debug/page_dump*.html
 ktu_page_dump.html
 debug/*.log
+debug/*

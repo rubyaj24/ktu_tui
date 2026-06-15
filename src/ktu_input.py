@@ -17,6 +17,8 @@ console = Console()
 
 KEY_UP = "UP"
 KEY_DOWN = "DOWN"
+KEY_LEFT = "LEFT"
+KEY_RIGHT = "RIGHT"
 KEY_ENTER = "ENTER"
 KEY_ESC = "ESC"
 KEY_CTRL_C = "CTRL_C"
@@ -35,7 +37,8 @@ if os.name == "nt":
         ch = msvcrt.getch()
         if ch == b"\xe0":
             ch2 = msvcrt.getch()
-            return {b"H": KEY_UP, b"P": KEY_DOWN}.get(ch2, "")
+            return {b"H": KEY_UP, b"P": KEY_DOWN,
+                    b"M": KEY_RIGHT, b"K": KEY_LEFT}.get(ch2, "")
         if ch in (b"\r", b"\n"):
             return KEY_ENTER
         if ch == b"\x03":
@@ -83,7 +86,8 @@ else:
                         cc_array[termios.VMIN] = orig_vmin
                         cc_array[termios.VTIME] = orig_vtime
                         termios.tcsetattr(fd, termios.TCSADRAIN, attrs)
-                    return {"A": KEY_UP, "B": KEY_DOWN}.get(ch3, KEY_ESC)
+                    return {"A": KEY_UP, "B": KEY_DOWN,
+                            "C": KEY_RIGHT, "D": KEY_LEFT}.get(ch3, KEY_ESC)
                 return KEY_ESC  # standalone Esc or unknown sequence
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)

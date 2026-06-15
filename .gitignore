@@ -8,3 +8,11 @@ __pycache__/
 .ktu_tui/
 debug/page_dump*.html
 ktu_page_dump.html
+
+# Credentials
+.env
+
+# Debug logs (keep hand-collected pages, ignore generated dumps)
+debug/page_dump*.html
+ktu_page_dump.html
+debug/*.log

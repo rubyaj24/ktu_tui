@@ -60,6 +60,7 @@ EXAM_URL = f"{BASE_URL}/eu/exm/viewStudentExamDefinition.htm"
 PROFILE_URL = f"{BASE_URL}/eu/stu/studentBasicProfile.htm"
 STUDENT_DETAILS_URL = f"{BASE_URL}/eu/stu/studentDetailsView.htm"
 PENDING_RESULTS_URL = f"{BASE_URL}/eu/res/pendingResults.htm"
+SEMESTER_GRADE_CARD_URL = f"{BASE_URL}/eu/res/semesterGradeCardListing.htm"
 CERTIFICATES_URL = f"{BASE_URL}/eu/stu/req/studentCertificatesListing.htm"
 FEES_URL = f"{BASE_URL}/eu/stu/studentFeeListing.htm"
 ATTENDANCE_URL = f"{BASE_URL}/eu/acd/studentSemesterListing.htm"
@@ -341,3 +342,28 @@ class KTUClient:
             "examType": exam_type,
         }
         return self.fetch(EXAM_URL, method="POST", data=payload)
+
+    def fetch_semester_grade_card(self, semester_id: str) -> PageResult:
+        """POST the semester grade card listing form.
+
+        semester_id is a portal code (e.g. '5' for S5).
+        """
+        if not self.logged_in:
+            return PageResult(ok=False, status=0, url=SEMESTER_GRADE_CARD_URL,
+                              final_url=SEMESTER_GRADE_CARD_URL,
+                              error="Not logged in.")
+
+        first = self.fetch(SEMESTER_GRADE_CARD_URL)
+        if not first.ok:
+            return first
+        if not first.html:
+            return PageResult(ok=False, status=first.status, url=SEMESTER_GRADE_CARD_URL,
+                              final_url=first.final_url, error="Empty response.")
+
+        csrf = self._extract_csrf(first.html)
+        payload = {
+            "form_name": "changePasswordForm",
+            "CSRF_TOKEN": csrf,
+            "semesterId": semester_id,
+        }
+        return self.fetch(SEMESTER_GRADE_CARD_URL, method="POST", data=payload)

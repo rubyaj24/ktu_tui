@@ -244,6 +244,13 @@ class KTUParser:
                 cols = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
                 if cols:
                     rows.append(cols)
+            # If no <th> tags but first row looks like a header (all-caps,
+            # column-name style), promote it
+            if not headers and rows:
+                first = rows[0]
+                if all(len(c.split()) <= 5 for c in first if c):
+                    headers = first
+                    rows = rows[1:]
             # Keep tables with rows OR with headers (an empty results
             # table is still informative — the page told us the structure)
             if rows or headers:
@@ -309,6 +316,8 @@ class KTUParser:
         "div#sidebar",
         "ul.nav.nav-pills.nav-stacked",  # common Bootstrap vertical nav
         "ul.nav-tabs",  # sometimes vertical tabs are used as nav
+        "nav#menu-ecoleaide",  # portal's current sidebar container
+        "ul.menu",  # menu list inside the sidebar
     ]
 
     @staticmethod
